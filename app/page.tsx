@@ -41,22 +41,10 @@ export default function HomePage() {
       alert("Adicione endereços antes de iniciar uma rota")
       return
     }
-    setStartingPointOpen(true)
-  }
 
-  const handleStartingPointConfirm = (startingPoint: string, lat?: number, lng?: number) => {
-    setTempStartingPoint({ point: startingPoint, lat, lng })
-    setStartingPointOpen(false)
-    setRoutePreviewOpen(true)
-  }
-
-  const handleRouteConfirm = () => {
-    if (tempStartingPoint) {
-      const route = createRoute(addresses, tempStartingPoint.point, tempStartingPoint.lat, tempStartingPoint.lng)
-      setCurrentRoute(route)
-      setRoutePreviewOpen(false)
-      setTempStartingPoint(null)
-    }
+    const route = createRoute(addresses)
+    setCurrentRoute(route)
+    window.location.href = "/route"
   }
 
   const handleEdit = (address: Address) => {
@@ -67,6 +55,15 @@ export default function HomePage() {
   const handleDialogClose = () => {
     setDialogOpen(false)
     setEditAddress(null)
+  }
+
+  const handleStartingPointConfirm = (point: string, lat?: number, lng?: number) => {
+    setTempStartingPoint({ point, lat, lng })
+    setRoutePreviewOpen(true)
+  }
+
+  const handleRouteConfirm = () => {
+    window.location.href = "/route"
   }
 
   return (
@@ -121,7 +118,7 @@ export default function HomePage() {
               ) : (
                 <Button size="lg" className="flex-1" onClick={handleStartRoute}>
                   <Navigation className="h-5 w-5 mr-2" />
-                  Calcular e Iniciar Rota
+                  Iniciar Rota
                 </Button>
               )}
             </div>

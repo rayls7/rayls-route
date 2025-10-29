@@ -1,7 +1,6 @@
 "use client"
 
 import type { Address, Visit, Route } from "./types"
-import { optimizeRoute } from "./route-optimizer"
 
 const STORAGE_KEYS = {
   ADDRESSES: "route-tracker-addresses",
@@ -67,22 +66,19 @@ export function getCurrentRoute(): Route | null {
   })
 }
 
-export function createRoute(
-  addresses: Address[],
-  startingPoint?: string,
-  startingLat?: number,
-  startingLng?: number,
-): Route {
-  // Use route optimizer to calculate best order
-  const optimizedAddresses = optimizeRoute(addresses, startingLat, startingLng)
+export function createRoute(addresses: Address[]): Route {
+  // Sort addresses by priority (high -> medium -> low)
+  const sortedAddresses = [...addresses].sort((a, b) => {
+    const priorityOrder = { high: 0, medium: 1, low: 2 }
+    const aPriority = priorityOrder[a.priority || "medium"]
+    const bPriority = priorityOrder[b.priority || "medium"]
+    return aPriority - bPriority
+  })
 
   const route: Route = {
     id: crypto.randomUUID(),
     date: new Date(),
-    startingPoint,
-    startingLat,
-    startingLng,
-    visits: optimizedAddresses.map((addr) => ({
+    visits: sortedAddresses.map((addr) => ({
       id: crypto.randomUUID(),
       addressId: addr.id,
       addressName: addr.name,

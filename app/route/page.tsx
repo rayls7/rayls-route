@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { ArrowLeft, MapPin, CheckCircle2, NavigationIcon, Camera } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, MapPin, CheckCircle2, NavigationIcon, Camera, Locate } from "lucide-react"
 import { getCurrentRoute, updateVisit, updateCurrentRoute, completeRoute } from "@/lib/storage"
 import type { Route, Visit } from "@/lib/types"
 import Link from "next/link"
@@ -15,6 +16,8 @@ export default function RoutePage() {
   const [currentVisitIndex, setCurrentVisitIndex] = useState(0)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraMode, setCameraMode] = useState<"start" | "end">("start")
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [watchId, setWatchId] = useState<number | null>(null)
 
   useEffect(() => {
     const loadedRoute = getCurrentRoute()
@@ -25,9 +28,52 @@ export default function RoutePage() {
         setCurrentVisitIndex(firstPending)
       }
     }
+
+    if (navigator.geolocation) {
+      const id = navigator.geolocation.watchPosition(
+        (position) => {
+          setCurrentLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          })
+        },
+        (error) => {
+          console.error("[v0] Error watching location:", error)
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 10000,
+          timeout: 5000,
+        },
+      )
+      setWatchId(id)
+    }
+
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId)
+      }
+    }
   }, [])
 
   const currentVisit = route?.visits[currentVisitIndex]
+
+  const handleNavigate = () => {
+    if (!currentVisit) return
+
+    const address = encodeURIComponent(currentVisit.address)
+
+    // Check if on iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+
+    if (isIOS) {
+      // Open Apple Maps
+      window.open(`maps://maps.apple.com/?q=${address}`, "_blank")
+    } else {
+      // Open Google Maps
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, "_blank")
+    }
+  }
 
   const handleArrived = () => {
     setCameraMode("start")
@@ -161,6 +207,23 @@ export default function RoutePage() {
             <div className="bg-accent h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
           </div>
 
+          {currentLocation && (
+            <Card className="p-4 bg-chart-1/10 border-chart-1">
+              <div className="flex items-center gap-3">
+                <Locate className="h-5 w-5 text-chart-1 animate-pulse" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Localização Atual</p>
+                  <p className="text-xs text-muted-foreground">
+                    {currentLocation.lat.toFixed(6)}, {currentLocation.lng.toFixed(6)}
+                  </p>
+                </div>
+                <Badge variant="outline" className="ml-auto bg-chart-1/20 text-chart-1 border-chart-1">
+                  Rastreando
+                </Badge>
+              </div>
+            </Card>
+          )}
+
           <Card className="p-6">
             <div className="flex items-start gap-4 mb-6">
               <div className="bg-primary text-primary-foreground rounded-full w-12 h-12 flex items-center justify-center font-bold text-lg">
@@ -176,6 +239,11 @@ export default function RoutePage() {
             </div>
 
             <div className="space-y-4">
+              <Button size="lg" className="w-full bg-transparent" variant="outline" onClick={handleNavigate}>
+                <NavigationIcon className="h-5 w-5 mr-2" />
+                Abrir GPS / Navegar
+              </Button>
+
               {currentVisit.status === "pending" && (
                 <Button size="lg" className="w-full" onClick={handleArrived}>
                   <Camera className="h-5 w-5 mr-2" />
@@ -245,7 +313,6 @@ export default function RoutePage() {
 
                   {currentVisitIndex < route.visits.length - 1 && (
                     <Button size="lg" className="w-full" onClick={handleNext}>
-                      <NavigationIcon className="h-5 w-5 mr-2" />
                       Próxima Visita
                     </Button>
                   )}
@@ -267,6 +334,7 @@ export default function RoutePage() {
                       <p className="font-medium text-foreground truncate">{visit.addressName}</p>
                       <p className="text-muted-foreground text-xs truncate">{visit.address}</p>
                     </div>
+                    {visit.status === "completed" && <CheckCircle2 className="h-5 w-5 text-chart-3" />}
                   </div>
                 ))}
               </div>
