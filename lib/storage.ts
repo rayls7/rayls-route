@@ -1,6 +1,7 @@
 "use client"
 
 import type { Address, Visit, Route } from "./types"
+import { optimizeRoute } from "./route-optimizer"
 
 const STORAGE_KEYS = {
   ADDRESSES: "route-tracker-addresses",
@@ -66,23 +67,19 @@ export function getCurrentRoute(): Route | null {
   })
 }
 
-export function createRoute(addresses: Address[]): Route {
-  // Sort addresses by priority (high -> medium -> low)
-  const sortedAddresses = [...addresses].sort((a, b) => {
-    const priorityOrder = { high: 0, medium: 1, low: 2 }
-    const aPriority = priorityOrder[a.priority || "medium"]
-    const bPriority = priorityOrder[b.priority || "medium"]
-    return aPriority - bPriority
-  })
+export function createRoute(addresses: Address[], startLat?: number, startLng?: number): Route {
+  const optimizedAddresses = optimizeRoute(addresses, startLat, startLng)
 
   const route: Route = {
     id: crypto.randomUUID(),
     date: new Date(),
-    visits: sortedAddresses.map((addr) => ({
+    visits: optimizedAddresses.map((addr) => ({
       id: crypto.randomUUID(),
       addressId: addr.id,
       addressName: addr.name,
       address: addr.address,
+      lat: addr.lat,
+      lng: addr.lng,
       startTime: new Date(),
       startKm: 0,
       status: "pending" as const,
@@ -124,11 +121,52 @@ export function addAddressToRoute(address: Address): void {
       addressId: address.id,
       addressName: address.name,
       address: address.address,
+      lat: address.lat,
+      lng: address.lng,
       startTime: new Date(),
       startKm: 0,
       status: "pending" as const,
     }
     route.visits.push(newVisit)
+
+    // Re-optimize remaining pending visits
+    const completedVisits = route.visits.filter((v) => v.status === "completed")
+    const pendingVisits = route.visits.filter((v) => v.status === "pending")
+
+    if (pendingVisits.length > 0) {
+      // Get current location from last completed visit or use first pending
+      let currentLat: number | undefined
+      let currentLng: number | undefined
+
+      if (completedVisits.length > 0) {
+        const lastCompleted = completedVisits[completedVisits.length - 1]
+        currentLat = lastCompleted.endLat
+        currentLng = lastCompleted.endLng
+      }
+
+      // Convert visits to addresses for optimization
+      const pendingAddresses: Address[] = pendingVisits.map((v) => ({
+        id: v.addressId,
+        name: v.addressName,
+        address: v.address,
+        lat: v.lat,
+        lng: v.lng,
+        priority: "medium",
+        order: 0,
+        createdAt: new Date(),
+      }))
+
+      const optimized = optimizeRoute(pendingAddresses, currentLat, currentLng)
+
+      // Update visits with optimized order
+      const optimizedVisits = optimized.map((addr) => {
+        const visit = pendingVisits.find((v) => v.addressId === addr.id)
+        return visit!
+      })
+
+      route.visits = [...completedVisits, ...optimizedVisits]
+    }
+
     updateCurrentRoute(route)
   }
 }

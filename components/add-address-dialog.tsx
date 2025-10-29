@@ -9,10 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MapPin, Loader2 } from "lucide-react"
 import type { Address } from "@/lib/types"
 import { saveAddress, updateAddress } from "@/lib/storage"
-import { getCurrentPosition } from "@/lib/geolocation"
+import { AddressAutocomplete } from "@/components/address-autocomplete"
 
 interface AddAddressDialogProps {
   open: boolean
@@ -28,7 +27,6 @@ export function AddAddressDialog({ open, onOpenChange, onSuccess, editAddress }:
   const [priority, setPriority] = useState<"high" | "medium" | "low">("medium")
   const [lat, setLat] = useState<number | undefined>()
   const [lng, setLng] = useState<number | undefined>()
-  const [loadingGPS, setLoadingGPS] = useState(false)
 
   useEffect(() => {
     if (editAddress) {
@@ -48,21 +46,19 @@ export function AddAddressDialog({ open, onOpenChange, onSuccess, editAddress }:
     }
   }, [editAddress, open])
 
-  const handleGetLocation = async () => {
-    setLoadingGPS(true)
-    try {
-      const position = await getCurrentPosition()
-      setLat(position.latitude)
-      setLng(position.longitude)
-    } catch (error) {
-      alert("Não foi possível obter a localização. Verifique as permissões.")
-    } finally {
-      setLoadingGPS(false)
-    }
+  const handleAddressSelect = (selectedAddress: string, selectedLat: number, selectedLng: number) => {
+    setAddress(selectedAddress)
+    setLat(selectedLat)
+    setLng(selectedLng)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!lat || !lng) {
+      alert("Por favor, selecione um endereço da lista para obter as coordenadas GPS.")
+      return
+    }
 
     if (editAddress) {
       updateAddress(editAddress.id, { name, address, notes, priority, lat, lng })
@@ -94,13 +90,15 @@ export function AddAddressDialog({ open, onOpenChange, onSuccess, editAddress }:
             </div>
             <div className="space-y-2">
               <Label htmlFor="address">Endereço Completo</Label>
-              <Input
-                id="address"
+              <AddressAutocomplete
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Rua, número, bairro, cidade"
-                required
+                onChange={setAddress}
+                onSelectAddress={handleAddressSelect}
+                placeholder="Digite o endereço e selecione da lista"
               />
+              <p className="text-xs text-muted-foreground">
+                Digite o endereço e selecione da lista para obter coordenadas GPS automaticamente
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="priority">Prioridade</Label>
@@ -114,35 +112,6 @@ export function AddAddressDialog({ open, onOpenChange, onSuccess, editAddress }:
                   <SelectItem value="low">Baixa</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Coordenadas GPS (Opcional)</Label>
-              <p className="text-xs text-muted-foreground">Adicione coordenadas para otimizar a rota automaticamente</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleGetLocation}
-                disabled={loadingGPS}
-                className="w-full bg-transparent"
-              >
-                {loadingGPS ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Obtendo localização...
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Usar Localização Atual
-                  </>
-                )}
-              </Button>
-              {lat !== undefined && lng !== undefined && (
-                <div className="text-xs text-muted-foreground bg-secondary p-2 rounded">
-                  Lat: {lat.toFixed(6)}, Lng: {lng.toFixed(6)}
-                </div>
-              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="notes">Observações</Label>

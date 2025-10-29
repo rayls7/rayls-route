@@ -2,40 +2,57 @@
 
 import { Card } from "@/components/ui/card"
 import { MapPin, Navigation, CheckCircle2, Clock } from "lucide-react"
-import type { Route } from "@/lib/types"
+import type { Route, Address } from "@/lib/types"
 
 interface DashboardStatsProps {
   route: Route | null
+  addresses: Address[]
 }
 
-export function DashboardStats({ route }: DashboardStatsProps) {
-  const totalVisits = route?.visits.length || 0
-  const completedVisits = route?.visits.filter((v) => v.status === "completed").length || 0
-  const inProgressVisits = route?.visits.filter((v) => v.status === "in-progress").length || 0
-  const pendingVisits = route?.visits.filter((v) => v.status === "pending").length || 0
+export function DashboardStats({ route, addresses }: DashboardStatsProps) {
+  const hasActiveRoute = route !== null
+
+  let totalCount = 0
+  let completedCount = 0
+  let inProgressCount = 0
+  let pendingCount = 0
+
+  if (hasActiveRoute) {
+    // When there's an active route, count visits
+    totalCount = route.visits.length
+    completedCount = route.visits.filter((v) => v.status === "completed").length
+    inProgressCount = route.visits.filter((v) => v.status === "in-progress").length
+    pendingCount = route.visits.filter((v) => v.status === "pending").length
+  } else {
+    // When there's no route, count addresses
+    totalCount = addresses.length
+    completedCount = 0
+    inProgressCount = 0
+    pendingCount = addresses.length
+  }
 
   const stats = [
     {
-      label: "Total de Visitas",
-      value: totalVisits,
+      label: hasActiveRoute ? "Total de Visitas" : "Total de Endereços",
+      value: totalCount,
       icon: MapPin,
       color: "text-primary",
     },
     {
       label: "Concluídas",
-      value: completedVisits,
+      value: completedCount,
       icon: CheckCircle2,
       color: "text-chart-3",
     },
     {
       label: "Em Andamento",
-      value: inProgressVisits,
+      value: inProgressCount,
       icon: Navigation,
       color: "text-accent",
     },
     {
       label: "Pendentes",
-      value: pendingVisits,
+      value: pendingCount,
       icon: Clock,
       color: "text-muted-foreground",
     },

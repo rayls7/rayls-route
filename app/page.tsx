@@ -89,7 +89,7 @@ export default function HomePage() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
-          <DashboardStats route={currentRoute} />
+          <DashboardStats route={currentRoute} addresses={addresses} />
 
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, MapPin, CheckCircle2, NavigationIcon, Camera, Locate } from "lucide-react"
+import { ArrowLeft, MapPin, CheckCircle2, NavigationIcon, Camera, Locate, AlertCircle } from "lucide-react"
 import { getCurrentRoute, updateVisit, updateCurrentRoute, completeRoute } from "@/lib/storage"
 import type { Route, Visit } from "@/lib/types"
 import Link from "next/link"
@@ -18,6 +18,7 @@ export default function RoutePage() {
   const [cameraMode, setCameraMode] = useState<"start" | "end">("start")
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [watchId, setWatchId] = useState<number | null>(null)
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadedRoute = getCurrentRoute()
@@ -30,23 +31,41 @@ export default function RoutePage() {
     }
 
     if (navigator.geolocation) {
+      console.log("[v0] Starting location tracking...")
       const id = navigator.geolocation.watchPosition(
         (position) => {
+          console.log("[v0] Location updated:", position.coords.latitude, position.coords.longitude)
           setCurrentLocation({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           })
+          setLocationError(null)
         },
         (error) => {
-          console.error("[v0] Error watching location:", error)
+          console.error("[v0] Location error:", error)
+          let errorMessage = "Erro ao obter localização"
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = "Permissão de localização negada. Ative nas configurações do navegador."
+              break
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = "Localização indisponível no momento."
+              break
+            case error.TIMEOUT:
+              errorMessage = "Tempo esgotado ao obter localização."
+              break
+          }
+          setLocationError(errorMessage)
         },
         {
           enableHighAccuracy: true,
           maximumAge: 10000,
-          timeout: 5000,
+          timeout: 10000,
         },
       )
       setWatchId(id)
+    } else {
+      setLocationError("Geolocalização não suportada pelo navegador")
     }
 
     return () => {
@@ -61,18 +80,27 @@ export default function RoutePage() {
   const handleNavigate = () => {
     if (!currentVisit) return
 
-    const address = encodeURIComponent(currentVisit.address)
-
-    // Check if on iOS
+    let url: string
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
 
-    if (isIOS) {
-      // Open Apple Maps
-      window.open(`maps://maps.apple.com/?q=${address}`, "_blank")
+    if (currentVisit.lat && currentVisit.lng) {
+      // Use coordinates for more accurate navigation
+      if (isIOS) {
+        url = `maps://maps.apple.com/?daddr=${currentVisit.lat},${currentVisit.lng}`
+      } else {
+        url = `https://www.google.com/maps/dir/?api=1&destination=${currentVisit.lat},${currentVisit.lng}`
+      }
     } else {
-      // Open Google Maps
-      window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, "_blank")
+      // Fallback to address
+      const address = encodeURIComponent(currentVisit.address)
+      if (isIOS) {
+        url = `maps://maps.apple.com/?q=${address}`
+      } else {
+        url = `https://www.google.com/maps/dir/?api=1&destination=${address}`
+      }
     }
+
+    window.open(url, "_blank")
   }
 
   const handleArrived = () => {
@@ -106,8 +134,8 @@ export default function RoutePage() {
         setRoute(updatedRoute)
       }
     } catch (error) {
-      console.error("Erro ao obter localização:", error)
-      alert("Não foi possível obter a localização. Verifique as permissões.")
+      console.error("[v0] Error getting location:", error)
+      alert("Não foi possível obter a localização. Verifique as permissões do navegador.")
     }
   }
 
@@ -154,8 +182,8 @@ export default function RoutePage() {
         }
       }
     } catch (error) {
-      console.error("Erro ao obter localização:", error)
-      alert("Não foi possível obter a localização. Verifique as permissões.")
+      console.error("[v0] Error getting location:", error)
+      alert("Não foi possível obter a localização. Verifique as permissões do navegador.")
     }
   }
 
@@ -207,11 +235,21 @@ export default function RoutePage() {
             <div className="bg-accent h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
           </div>
 
-          {currentLocation && (
+          {locationError ? (
+            <Card className="p-4 bg-destructive/10 border-destructive">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground">Erro de Localização</p>
+                  <p className="text-xs text-muted-foreground">{locationError}</p>
+                </div>
+              </div>
+            </Card>
+          ) : currentLocation ? (
             <Card className="p-4 bg-chart-1/10 border-chart-1">
               <div className="flex items-center gap-3">
                 <Locate className="h-5 w-5 text-chart-1 animate-pulse" />
-                <div>
+                <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">Localização Atual</p>
                   <p className="text-xs text-muted-foreground">
                     {currentLocation.lat.toFixed(6)}, {currentLocation.lng.toFixed(6)}
@@ -220,6 +258,16 @@ export default function RoutePage() {
                 <Badge variant="outline" className="ml-auto bg-chart-1/20 text-chart-1 border-chart-1">
                   Rastreando
                 </Badge>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-4 bg-secondary">
+              <div className="flex items-center gap-3">
+                <Locate className="h-5 w-5 text-muted-foreground animate-spin" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Obtendo localização...</p>
+                  <p className="text-xs text-muted-foreground">Aguarde enquanto detectamos sua posição</p>
+                </div>
               </div>
             </Card>
           )}
@@ -235,6 +283,12 @@ export default function RoutePage() {
                   <MapPin className="h-5 w-5 mt-0.5 flex-shrink-0" />
                   <p>{currentVisit.address}</p>
                 </div>
+                {currentVisit.lat && currentVisit.lng && (
+                  <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    GPS: {currentVisit.lat.toFixed(6)}, {currentVisit.lng.toFixed(6)}
+                  </div>
+                )}
               </div>
             </div>
 
