@@ -9,6 +9,7 @@ import { AddressList } from "@/components/address-list"
 import { AddAddressDialog } from "@/components/add-address-dialog"
 import { StartingPointDialog } from "@/components/starting-point-dialog"
 import { RoutePreviewDialog } from "@/components/route-preview-dialog"
+import { InstallPrompt } from "@/components/install-prompt"
 import { getAddresses, getCurrentRoute, createRoute } from "@/lib/storage"
 import type { Address, Route } from "@/lib/types"
 import Link from "next/link"
@@ -150,6 +151,8 @@ export default function HomePage() {
         startingLng={tempStartingPoint?.lng}
         onConfirm={handleRouteConfirm}
       />
+
+      <InstallPrompt />
     </div>
   )
 }
